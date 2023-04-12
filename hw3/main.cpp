@@ -8,6 +8,11 @@
 #include "Texture.hpp"
 #include "OBJ_Loader.h"
 
+
+inline float deg2rad(float angle){
+    return angle / 180.0f * MY_PI;
+}
+
 Eigen::Matrix4f get_view_matrix(Eigen::Vector3f eye_pos)
 {
     Eigen::Matrix4f view = Eigen::Matrix4f::Identity();
@@ -49,7 +54,19 @@ Eigen::Matrix4f get_model_matrix(float angle)
 
 Eigen::Matrix4f get_projection_matrix(float eye_fov, float aspect_ratio, float zNear, float zFar)
 {
-    // TODO: Use the same projection matrix from the previous assignments
+    Eigen::Matrix4f projection = Eigen::Matrix4f::Identity();
+
+    float rd = deg2rad(eye_fov/2.0f);
+    float t = zNear*std::tan(rd);
+    float r = t * aspect_ratio;
+
+    Eigen::Matrix4f m;
+    m << 1 / std::tan(rd)*aspect_ratio, 0, 0, 0, 0, 1/std::tan(rd), 0, 0, 0, 0, -(zFar+zNear)/(zFar-zNear), -2*zFar*zNear/(zFar-zNear), 0, 0, -1, 0;
+
+    projection = m * projection;
+
+
+    return projection;
 
 }
 
