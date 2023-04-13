@@ -225,7 +225,24 @@ Eigen::Vector3f displacement_fragment_shader(const fragment_shader_payload& payl
     // Vector ln = (-dU, -dV, 1)
     // Position p = p + kn * n * h(u,v)
     // Normal n = normalize(TBN * ln)
+    auto x=normal.x(), y=normal.y(), z=normal.z();
+    auto t = Eigen::Vector3f(x*y/std::sqrt(x*x+z*z), std::sqrt(x*x+z*z), z*y/std::sqrt(x*x+z*z));
+    auto b = normal.cross(t);
+    Eigen::Matrix3f TBN;
+    TBN << 
+        t.x(), b.x(), x,
+        t.y(), b.y(), y,
+        t.z(), b.z(), z;
 
+    auto u=payload.tex_coords.x(), v=payload.tex_coords.y();
+    auto h=payload.texture->height, w=payload.texture->width;
+
+    auto s = payload.texture->getColor(u, v).norm();
+    auto dU = kh * kn * (payload.texture->getColor(u+1.f/w, v).norm() - s);
+    auto dV = kh * kn * (payload.texture->getColor(u, v+1.f/h).norm() - s);
+    auto ln = Eigen::Vector3f(-dU, -dV, 1);
+    auto n = (TBN * ln).normalized();
+    point = point + kn * s * n;
 
     Eigen::Vector3f result_color = {0, 0, 0};
 
@@ -234,6 +251,17 @@ Eigen::Vector3f displacement_fragment_shader(const fragment_shader_payload& payl
         // TODO: For each light source in the code, calculate what the *ambient*, *diffuse*, and *specular* 
         // components are. Then, accumulate that result on the *result_color* object.
 
+        auto l = (light.position - point).normalized();
+        auto v = (eye_pos - point).normalized();
+        auto h = (v + l).normalized();
+
+        float r2 = (light.position - point).squaredNorm();
+
+        auto ambient = ka.cwiseProduct(amb_light_intensity);
+        auto diffuse = kd.cwiseProduct(light.intensity / r2) * std::max(0.f, n.dot(l));
+        auto specular = ks.cwiseProduct(light.intensity / r2) * std::pow(std::max(0.f, n.dot(h)), p);
+
+        result_color += (ambient + diffuse + specular);
 
     }
 
@@ -362,7 +390,7 @@ int main(int argc, const char** argv)
         }
         else if (argc == 3 && std::string(argv[2]) == "displacement")
         {
-            std::cout << "Rasterizing using the bump shader\n";
+            std::cout << "Rasterizing using the displacement shader\n";
             active_shader = displacement_fragment_shader;
         }
     }
